@@ -141,8 +141,9 @@
 
     /* Tile with a letter typed (not yet submitted) */
     .tile.filled {
-      border-color: #565656;
-      animation: pop 0.05s ease-in-out;
+      border-color: #999999;
+      font-size: 2.1rem;
+      animation: pop 0.08s ease-in-out;
     }
 
     @keyframes pop {
@@ -247,7 +248,11 @@
     }
 
     .key:active {
-      filter: brightness(0.85);
+      filter: brightness(0.75);
+    }
+
+    .key:focus {
+      outline: none;
     }
 
     .key.correct { background: #538d4e; }
