@@ -456,6 +456,43 @@
     .help-tile.present { background: #b59f3b; border-color: #b59f3b; }
     .help-tile.absent  { background: #3a3a3c; border-color: #3a3a3c; }
 
+    /* Mode toggle pill */
+    .mode-toggle {
+      display: flex;
+      background: #1a1a1c;
+      border: 1px solid #3a3a3c;
+      border-radius: 20px;
+      padding: 3px;
+      gap: 2px;
+      position: absolute;
+      left: 16px;
+    }
+
+    .mode-btn {
+      background: none;
+      border: none;
+      color: #818384;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: 16px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .mode-btn.active-normal {
+      background: #538d4e;
+      color: #ffffff;
+    }
+
+    .mode-btn.active-beginner {
+      background: #b59f3b;
+      color: #ffffff;
+    }
+
     /* Signature */
     .signature {
       position: fixed;
@@ -1354,24 +1391,25 @@
         <>
           {/* Header */}
           <div className="header">
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-              <div className="header-title">Wordle</div>
-              {mode === 'beginner' && (
-                <div style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: '#b59f3b', fontWeight: 700, textTransform: 'uppercase' }}>
-                  For Beginners
-                </div>
-              )}
-            </div>
-            <div className="header-icons">
-              {/* Mode toggle */}
+            {/* Mode toggle pill — left side */}
+            <div className="mode-toggle">
               <button
-                className="icon-btn"
-                onClick={toggleMode}
-                title={mode === 'normal' ? 'Switch to For Beginners (10 tries)' : 'Switch to Normal (6 tries)'}
-                style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.05em', padding: '4px 7px', border: '1px solid #3a3a3c', borderRadius: '4px', color: mode === 'beginner' ? '#b59f3b' : '#818384' }}
+                className={`mode-btn${mode === 'normal' ? ' active-normal' : ''}`}
+                onClick={() => mode !== 'normal' && toggleMode()}
               >
-                {mode === 'beginner' ? '10' : '6'}
+                Normal
               </button>
+              <button
+                className={`mode-btn${mode === 'beginner' ? ' active-beginner' : ''}`}
+                onClick={() => mode !== 'beginner' && toggleMode()}
+              >
+                Beginner
+              </button>
+            </div>
+
+            <div className="header-title">Wordle</div>
+
+            <div className="header-icons">
               <button className="icon-btn" onClick={() => setShowHelp(true)} title="How to Play">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/>
