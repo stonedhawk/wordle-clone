@@ -709,7 +709,6 @@
     // CONSTANTS
     // ============================================================
 
-    const MAX_GUESSES = 6;
     const WORD_LENGTH = 5;
     const DAILY_ANSWER = getDailyAnswer();
 
@@ -755,43 +754,72 @@
     // LOCAL STORAGE
     // ============================================================
 
-    const STATE_KEY = `wordle-state-${getTodayKey()}`;
-    const STATS_KEY = 'wordle-stats';
+    const MODE_KEY = 'wordle-mode';
 
-    function loadGameState() {
+    function loadMode() {
+      return localStorage.getItem(MODE_KEY) || 'normal';
+    }
+
+    function saveMode(m) {
+      try { localStorage.setItem(MODE_KEY, m); } catch {}
+    }
+
+    function getStateKey(mode) {
+      return `wordle-state-${mode}-${getTodayKey()}`;
+    }
+
+    function getStatsKey(mode) {
+      return `wordle-stats-${mode}`;
+    }
+
+    function loadGameStateForMode(mode) {
       try {
-        const raw = localStorage.getItem(STATE_KEY);
+        const raw = localStorage.getItem(getStateKey(mode));
         return raw ? JSON.parse(raw) : null;
       } catch { return null; }
     }
 
-    function saveGameState(state) {
+    function saveGameStateForMode(mode, state) {
       try {
-        localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        localStorage.setItem(getStateKey(mode), JSON.stringify(state));
       } catch {}
+    }
+
+    // Keep legacy keys working for existing normal-mode saves
+    function loadGameState() { return loadGameStateForMode(loadMode()); }
+    function saveGameState(state) { saveGameStateForMode(loadMode(), state); }
+
+    function defaultStats(mode) {
+      const dist = {};
+      const max = mode === 'beginner' ? 10 : 6;
+      for (let i = 1; i <= max; i++) dist[i] = 0;
+      return { played: 0, won: 0, currentStreak: 0, maxStreak: 0, distribution: dist, lastWonDate: null };
+    }
+
+    function loadStatsForMode(mode) {
+      try {
+        const raw = localStorage.getItem(getStatsKey(mode));
+        return raw ? JSON.parse(raw) : defaultStats(mode);
+      } catch { return defaultStats(mode); }
+    }
+
+    function saveStatsForMode(mode, stats) {
+      try { localStorage.setItem(getStatsKey(mode), JSON.stringify(stats)); } catch {}
     }
 
     function loadStats() {
       try {
-        const raw = localStorage.getItem(STATS_KEY);
+        const raw = localStorage.getItem(getStatsKey(loadMode()));
         return raw ? JSON.parse(raw) : {
-          played: 0, won: 0, currentStreak: 0, maxStreak: 0,
-          distribution: { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
-          lastWonDate: null,
+          ...defaultStats(loadMode()),
         };
       } catch {
-        return {
-          played: 0, won: 0, currentStreak: 0, maxStreak: 0,
-          distribution: { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
-          lastWonDate: null,
-        };
+        return defaultStats(loadMode());
       }
     }
 
     function saveStats(stats) {
-      try {
-        localStorage.setItem(STATS_KEY, JSON.stringify(stats));
-      } catch {}
+      saveStatsForMode(loadMode(), stats);
     }
 
     // ============================================================
@@ -816,24 +844,30 @@
     const { useState, useEffect, useCallback, useRef } = React;
 
     function App() {
-      // Initialize state from localStorage or fresh
-      const initState = () => {
-        const saved = loadGameState();
+      // Mode: 'normal' (6 guesses) or 'beginner' (10 guesses)
+      // Read once at mount to use as the initial mode
+      const initialMode = loadMode();
+      const [mode, setMode] = useState(initialMode);
+      const maxGuesses = mode === 'beginner' ? 10 : 6;
+
+      // Initialize game state from the correct mode's localStorage slot
+      const initState = (m) => {
+        const saved = loadGameStateForMode(m);
         if (saved) return saved;
         return {
-          guesses: [],        // array of evaluated guess rows
-          currentGuess: '',   // letters typed so far in current row
-          gameStatus: 'playing', // 'playing' | 'won' | 'lost'
+          guesses: [],
+          currentGuess: '',
+          gameStatus: 'playing',
         };
       };
 
-      const [guesses, setGuesses] = useState(() => initState().guesses);
-      const [currentGuess, setCurrentGuess] = useState(() => initState().currentGuess);
-      const [gameStatus, setGameStatus] = useState(() => initState().gameStatus);
+      const [guesses, setGuesses] = useState(() => initState(initialMode).guesses);
+      const [currentGuess, setCurrentGuess] = useState(() => initState(initialMode).currentGuess);
+      const [gameStatus, setGameStatus] = useState(() => initState(initialMode).gameStatus);
 
       // Key letter states for on-screen keyboard coloring
       const [keyStates, setKeyStates] = useState(() => {
-        const saved = loadGameState();
+        const saved = loadGameStateForMode(initialMode);
         if (saved && saved.keyStates) return saved.keyStates;
         return {};
       });
@@ -844,9 +878,8 @@
       const [bounceRow, setBounceRow] = useState(null);
       // revealedCells[r][c] = true when that tile's color should be shown
       const [revealedCells, setRevealedCells] = useState(() => {
-        const saved = loadGameState();
+        const saved = loadGameStateForMode(initialMode);
         if (saved && saved.revealedCells) return saved.revealedCells;
-        // All previously submitted rows are fully revealed
         return saved ? saved.guesses.map(() => Array(WORD_LENGTH).fill(true)) : [];
       });
 
@@ -857,8 +890,8 @@
       // Toasts
       const [toasts, setToasts] = useState([]);
 
-      // Stats
-      const [stats, setStats] = useState(() => loadStats());
+      // Stats (mode-specific)
+      const [stats, setStats] = useState(() => loadStatsForMode(initialMode));
 
       // Countdown
       const [countdown, setCountdown] = useState(getTimeUntilMidnight());
@@ -866,8 +899,8 @@
       // -------- Persistence --------
       useEffect(() => {
         const state = { guesses, currentGuess, gameStatus, keyStates, revealedCells };
-        saveGameState(state);
-      }, [guesses, currentGuess, gameStatus, keyStates, revealedCells]);
+        saveGameStateForMode(mode, state);
+      }, [guesses, currentGuess, gameStatus, keyStates, revealedCells, mode]);
 
       // Countdown ticker
       useEffect(() => {
@@ -882,6 +915,28 @@
           return () => clearTimeout(t);
         }
       }, [gameStatus]);
+
+      // -------- Mode toggle --------
+      const toggleMode = useCallback(() => {
+        const newMode = mode === 'normal' ? 'beginner' : 'normal';
+        saveMode(newMode);
+        // Load saved state for the new mode (or start fresh)
+        const saved = loadGameStateForMode(newMode);
+        const fresh = { guesses: [], currentGuess: '', gameStatus: 'playing', keyStates: {}, revealedCells: [] };
+        const s = saved || fresh;
+        setMode(newMode);
+        setGuesses(s.guesses || []);
+        setCurrentGuess(s.currentGuess || '');
+        setGameStatus(s.gameStatus || 'playing');
+        setKeyStates(s.keyStates || {});
+        setRevealedCells(s.revealedCells || (s.guesses || []).map(() => Array(WORD_LENGTH).fill(true)));
+        setStats(loadStatsForMode(newMode));
+        setToasts([]);
+        setShowStats(false);
+        setShakingRow(null);
+        setFlippingRow(null);
+        setBounceRow(null);
+      }, [mode]);
 
       // -------- Toast helpers --------
       const showToast = useCallback((msg, persist = false) => {
@@ -953,7 +1008,7 @@
           updateKeyStates(evaluated);
 
           const isWin = evaluated.every(e => e.state === 'correct');
-          const isLoss = !isWin && rowIndex + 1 >= MAX_GUESSES;
+          const isLoss = !isWin && rowIndex + 1 >= maxGuesses;
 
           if (isWin) {
             const messages = ['Genius!','Magnificent!','Impressive!','Splendid!','Great!','Phew!'];
@@ -982,7 +1037,7 @@
             newStats.maxStreak = Math.max(newStats.maxStreak, newStats.currentStreak);
             newStats.lastWonDate = today;
             setStats(newStats);
-            saveStats(newStats);
+            saveStatsForMode(mode, newStats);
           } else if (isLoss) {
             showToast(DAILY_ANSWER, true);
             setGameStatus('lost');
@@ -991,10 +1046,10 @@
             newStats.played++;
             newStats.currentStreak = 0;
             setStats(newStats);
-            saveStats(newStats);
+            saveStatsForMode(mode, newStats);
           }
         }, WORD_LENGTH * 300 + 200);
-      }, [currentGuess, guesses, gameStatus, showToast, updateKeyStates, stats]);
+      }, [currentGuess, guesses, gameStatus, showToast, updateKeyStates, stats, mode, maxGuesses]);
 
       // -------- Handle key input --------
       const handleKey = useCallback((key) => {
@@ -1024,7 +1079,8 @@
       const handleShare = useCallback(() => {
         const dayNum = getDayOfYear(new Date());
         const guessCount = gameStatus === 'won' ? guesses.length : 'X';
-        const header = `Wordle Clone ${dayNum} ${guessCount}/6`;
+        const modeTag = mode === 'beginner' ? ' [Beginner]' : '';
+        const header = `Wordle Clone ${dayNum}${modeTag} ${guessCount}/${maxGuesses}`;
         const green  = String.fromCodePoint(0x1F7E9); // green square
         const yellow = String.fromCodePoint(0x1F7E8); // yellow square
         const black  = String.fromCodePoint(0x2B1B);  // black square
@@ -1043,12 +1099,12 @@
           document.body.removeChild(ta);
           showToast('Copied to clipboard!');
         }
-      }, [guesses, gameStatus, showToast]);
+      }, [guesses, gameStatus, showToast, mode, maxGuesses]);
 
       // -------- Render board --------
       const renderBoard = () => {
         const rows = [];
-        for (let r = 0; r < MAX_GUESSES; r++) {
+        for (let r = 0; r < maxGuesses; r++) {
           const isCurrentRow = r === guesses.length;
           const isShaking = shakingRow === r;
 
@@ -1140,7 +1196,7 @@
           <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowStats(false); }}>
             <div className="modal">
               <button className="modal-close" onClick={() => setShowStats(false)}>x</button>
-              <h2>STATISTICS</h2>
+              <h2>STATISTICS{mode === 'beginner' ? ' - FOR BEGINNERS' : ''}</h2>
               <div className="stats-grid">
                 {[
                   [stats.played, 'Played'],
@@ -1156,7 +1212,7 @@
               </div>
               <div className="distribution-title">GUESS DISTRIBUTION</div>
               <div className="distribution">
-                {[1,2,3,4,5,6].map(n => {
+                {Array.from({length: maxGuesses}, (_, i) => i + 1).map(n => {
                   const count = stats.distribution[n] || 0;
                   const width = Math.max(28, Math.round((count / maxVal) * 100));
                   const highlight = currentGuessCount === n;
@@ -1244,7 +1300,7 @@
       // we use a slightly different approach: wrap each row's 5 tiles in a sub-grid.
       const renderBoardV2 = () => {
         const rows = [];
-        for (let r = 0; r < MAX_GUESSES; r++) {
+        for (let r = 0; r < maxGuesses; r++) {
           const isCurrentRow = r === guesses.length;
           const isShaking = shakingRow === r;
           const tiles = [];
@@ -1298,8 +1354,24 @@
         <>
           {/* Header */}
           <div className="header">
-            <div className="header-title">Wordle</div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+              <div className="header-title">Wordle</div>
+              {mode === 'beginner' && (
+                <div style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: '#b59f3b', fontWeight: 700, textTransform: 'uppercase' }}>
+                  For Beginners
+                </div>
+              )}
+            </div>
             <div className="header-icons">
+              {/* Mode toggle */}
+              <button
+                className="icon-btn"
+                onClick={toggleMode}
+                title={mode === 'normal' ? 'Switch to For Beginners (10 tries)' : 'Switch to Normal (6 tries)'}
+                style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.05em', padding: '4px 7px', border: '1px solid #3a3a3c', borderRadius: '4px', color: mode === 'beginner' ? '#b59f3b' : '#818384' }}
+              >
+                {mode === 'beginner' ? '10' : '6'}
+              </button>
               <button className="icon-btn" onClick={() => setShowHelp(true)} title="How to Play">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/>
