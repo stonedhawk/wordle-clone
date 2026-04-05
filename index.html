@@ -1289,6 +1289,17 @@
             <div className="keyboard">
               {renderKeyboard()}
             </div>
+
+            {/* Share button visible after game ends */}
+            {gameStatus !== 'playing' && (
+              <button
+                className="share-btn"
+                style={{ marginTop: '16px' }}
+                onClick={handleShare}
+              >
+                SHARE
+              </button>
+            )}
           </div>
 
           {/* Modals */}
