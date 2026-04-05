@@ -466,6 +466,40 @@
       pointer-events: none;
       user-select: none;
     }
+
+    /* Responsive: shrink tiles on short viewports */
+    @media (max-height: 700px) {
+      .board-row .tile {
+        width: 52px;
+        height: 52px;
+        font-size: 1.6rem;
+      }
+      .key {
+        height: 48px;
+        font-size: 0.75rem;
+      }
+      .header-title {
+        font-size: 1.5rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .board-row .tile {
+        width: 52px;
+        height: 52px;
+        font-size: 1.6rem;
+      }
+      .key {
+        min-width: 32px;
+        max-width: 36px;
+        font-size: 0.7rem;
+        padding: 0 4px;
+      }
+      .key.wide {
+        min-width: 50px;
+        max-width: 56px;
+      }
+    }
   </style>
 </head>
 <body>
