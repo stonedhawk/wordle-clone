@@ -808,9 +808,12 @@
       const [shakingRow, setShakingRow] = useState(null);
       const [flippingRow, setFlippingRow] = useState(null);
       const [bounceRow, setBounceRow] = useState(null);
-      const [revealedRows, setRevealedRows] = useState(() => {
+      // revealedCells[r][c] = true when that tile's color should be shown
+      const [revealedCells, setRevealedCells] = useState(() => {
         const saved = loadGameState();
-        return saved ? (saved.revealedRows || Array(saved.guesses.length).fill(true)) : [];
+        if (saved && saved.revealedCells) return saved.revealedCells;
+        // All previously submitted rows are fully revealed
+        return saved ? saved.guesses.map(() => Array(WORD_LENGTH).fill(true)) : [];
       });
 
       // Modals
@@ -828,9 +831,9 @@
 
       // -------- Persistence --------
       useEffect(() => {
-        const state = { guesses, currentGuess, gameStatus, keyStates, revealedRows };
+        const state = { guesses, currentGuess, gameStatus, keyStates, revealedCells };
         saveGameState(state);
-      }, [guesses, currentGuess, gameStatus, keyStates, revealedRows]);
+      }, [guesses, currentGuess, gameStatus, keyStates, revealedCells]);
 
       // Countdown ticker
       useEffect(() => {
@@ -893,18 +896,25 @@
         // Start flip animation
         setFlippingRow(rowIndex);
 
-        // Add the guess immediately (for tile display), mark as not yet revealed
+        // Add the guess immediately (for tile display), init cells as unrevealed
         setGuesses(prev => [...prev, evaluated]);
         setCurrentGuess('');
-        setRevealedRows(prev => [...prev, false]);
+        setRevealedCells(prev => [...prev, Array(WORD_LENGTH).fill(false)]);
 
-        // After flip completes, reveal colors and update keyboard
+        // Reveal each tile at the midpoint of its individual flip (c*300 + 250ms)
+        for (let c = 0; c < WORD_LENGTH; c++) {
+          const col = c;
+          setTimeout(() => {
+            setRevealedCells(prev => {
+              const next = prev.map(row => [...row]);
+              if (next[rowIndex]) next[rowIndex][col] = true;
+              return next;
+            });
+          }, col * 300 + 250);
+        }
+
+        // After all flips complete, update keyboard and check win/loss
         setTimeout(() => {
-          setRevealedRows(prev => {
-            const next = [...prev];
-            next[rowIndex] = true;
-            return next;
-          });
           setFlippingRow(null);
           updateKeyStates(evaluated);
 
@@ -1003,18 +1013,18 @@
               // Submitted guess
               const evalEntry = guesses[r];
               letter = evalEntry[c].letter;
-              const revealed = revealedRows[r];
-              if (revealed) {
+              const cellRevealed = revealedCells[r] && revealedCells[r][c];
+              if (cellRevealed) {
                 tileClass += ` ${evalEntry[c].state}`;
-              } else {
-                // During flip: apply color at midpoint via delay
-                const delay = c * 300;
-                style = { animationDelay: `${delay}ms` };
+              }
+              // Flip animation for the row being animated
+              if (flippingRow === r) {
+                style = { animationDelay: `${c * 300}ms` };
                 tileClass += ' flip';
               }
               if (bounceRow === r) {
                 tileClass += ' bounce';
-                style = { ...style, animationDelay: `${c * 80}ms` };
+                style = { animationDelay: `${c * 80}ms` };
               }
             } else if (isCurrentRow) {
               letter = currentGuess[c] || '';
@@ -1198,17 +1208,18 @@
             if (r < guesses.length) {
               const evalEntry = guesses[r];
               letter = evalEntry[c].letter;
-              const revealed = revealedRows[r];
-              if (revealed) {
+              const cellRevealed = revealedCells[r] && revealedCells[r][c];
+              if (cellRevealed) {
                 tileClass += ` ${evalEntry[c].state}`;
-                if (bounceRow === r) {
-                  tileClass += ' bounce';
-                  style = { animationDelay: `${c * 80}ms` };
-                }
-              } else {
-                const delay = c * 300;
-                style = { animationDelay: `${delay}ms` };
+              }
+              // Apply flip animation for the row currently being revealed
+              if (flippingRow === r) {
+                style = { animationDelay: `${c * 300}ms` };
                 tileClass += ' flip';
+              }
+              if (bounceRow === r) {
+                tileClass += ' bounce';
+                style = { animationDelay: `${c * 80}ms` };
               }
             } else if (isCurrentRow) {
               letter = currentGuess[c] || '';
