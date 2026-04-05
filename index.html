@@ -989,11 +989,26 @@
       // -------- Share --------
       const handleShare = useCallback(() => {
         const dayNum = getDayOfYear(new Date());
-        const header = `Wordle Clone ${dayNum} ${gameStatus === 'won' ? guesses.length : 'X'}/6`;
-        const emojiMap = { correct: String.fromCodePoint(0x1F7E9), present: String.fromCodePoint(0x1F7E8), absent: String.fromCodePoint(0x2B1B) };
+        const guessCount = gameStatus === 'won' ? guesses.length : 'X';
+        const header = `Wordle Clone ${dayNum} ${guessCount}/6`;
+        const green  = String.fromCodePoint(0x1F7E9); // green square
+        const yellow = String.fromCodePoint(0x1F7E8); // yellow square
+        const black  = String.fromCodePoint(0x2B1B);  // black square
+        const emojiMap = { correct: green, present: yellow, absent: black };
         const rows = guesses.map(row => row.map(e => emojiMap[e.state]).join('')).join('\n');
         const text = `${header}\n\n${rows}`;
-        navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+        } else {
+          // Fallback for browsers without clipboard API
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          showToast('Copied to clipboard!');
+        }
       }, [guesses, gameStatus, showToast]);
 
       // -------- Render board --------
