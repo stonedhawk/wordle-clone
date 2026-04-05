@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wordle Clone</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #121213;
+      color: #ffffff;
+      font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    #root {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Header */
+    .header {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #3a3a3c;
+      position: relative;
+    }
+
+    .header-title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .header-icons {
+      position: absolute;
+      right: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #ffffff;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* Game container */
+    .game-container {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 8px;
+      flex: 1;
+    }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast {
+      background: #ffffff;
+      color: #121213;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      animation: slideDown 0.15s ease-out;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Board */
+    .board {
+      display: grid;
+      grid-template-rows: repeat(6, 62px);
+      grid-template-columns: repeat(5, 62px);
+      gap: 5px;
+      margin-bottom: 24px;
+    }
+
+    .tile {
+      width: 62px;
+      height: 62px;
+      border: 2px solid #3a3a3c;
+      background: #121213;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #ffffff;
+      user-select: none;
+      transition: border-color 0.05s;
+      position: relative;
+    }
+
+    /* Tile with a letter typed (not yet submitted) */
+    .tile.filled {
+      border-color: #565656;
+      animation: pop 0.05s ease-in-out;
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    /* Revealed tile states */
+    .tile.correct {
+      background: #538d4e;
+      border-color: #538d4e;
+    }
+    .tile.present {
+      background: #b59f3b;
+      border-color: #b59f3b;
+    }
+    .tile.absent {
+      background: #3a3a3c;
+      border-color: #3a3a3c;
+    }
+
+    /* Flip animation */
+    .tile.flip {
+      animation: flip 0.5s ease forwards;
+    }
+
+    @keyframes flip {
+      0%   { transform: rotateX(0deg); }
+      49%  { transform: rotateX(90deg); }
+      50%  { transform: rotateX(90deg); }
+      100% { transform: rotateX(0deg); }
+    }
+
+    /* Row shake animation (invalid word) */
+    .row-shake {
+      animation: shake 0.6s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%       { transform: translateX(-4px); }
+      30%       { transform: translateX(4px); }
+      50%       { transform: translateX(-4px); }
+      70%       { transform: translateX(4px); }
+      90%       { transform: translateX(-2px); }
+    }
+
+    /* Bounce animation on win */
+    .tile.bounce {
+      animation: bounce 0.4s ease forwards;
+    }
+
+    @keyframes bounce {
+      0%   { transform: translateY(0); }
+      40%  { transform: translateY(-20px); }
+      70%  { transform: translateY(-10px); }
+      100% { transform: translateY(0); }
+    }
+
+    /* Keyboard */
+    .keyboard {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 4px;
+    }
+
+    .keyboard-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .key {
+      height: 58px;
+      min-width: 43px;
+      background: #818384;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      user-select: none;
+      transition: background 0.1s, filter 0.1s;
+      padding: 0 8px;
+      flex: 1;
+      max-width: 43px;
+    }
+
+    .key.wide {
+      min-width: 65px;
+      max-width: 65px;
+      font-size: 0.75rem;
+    }
+
+    .key:active {
+      filter: brightness(0.85);
+    }
+
+    .key.correct { background: #538d4e; }
+    .key.present { background: #b59f3b; }
+    .key.absent  { background: #3a3a3c; }
+
+    /* Modal overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+
+    .modal {
+      background: #121213;
+      border: 1px solid #3a3a3c;
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 420px;
+      position: relative;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal h2 {
+      text-align: center;
+      letter-spacing: 0.1em;
+      margin-bottom: 20px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    /* Stats modal */
+    .stats-grid {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 0.65rem;
+      color: #818384;
+      text-align: center;
+      max-width: 60px;
+    }
+
+    .distribution-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .distribution {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 24px;
+    }
+
+    .dist-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .dist-label {
+      width: 12px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .dist-bar-wrap {
+      flex: 1;
+    }
+
+    .dist-bar {
+      background: #3a3a3c;
+      min-width: 28px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-align: right;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .dist-bar.highlight {
+      background: #538d4e;
+    }
+
+    .stats-footer {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      border-top: 1px solid #3a3a3c;
+      padding-top: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .countdown-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .countdown-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #818384;
+    }
+
+    .countdown-time {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    .share-btn {
+      background: #538d4e;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: filter 0.1s;
+    }
+
+    .share-btn:active {
+      filter: brightness(0.9);
+    }
+
+    /* Help modal example tiles */
+    .help-section {
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      border-bottom: 1px solid #3a3a3c;
+      padding-bottom: 16px;
+    }
+
+    .help-section:last-child {
+      border-bottom: none;
+    }
+
+    .help-example {
+      display: flex;
+      gap: 4px;
+      margin: 10px 0 6px;
+    }
+
+    .help-tile {
+      width: 42px;
+      height: 42px;
+      border: 2px solid #3a3a3c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .help-tile.correct { background: #538d4e; border-color: #538d4e; }
+    .help-tile.present { background: #b59f3b; border-color: #b59f3b; }
+    .help-tile.absent  { background: #3a3a3c; border-color: #3a3a3c; }
+
+    /* Signature */
+    .signature {
+      position: fixed;
+      bottom: 10px;
+      right: 14px;
+      font-size: 11px;
+      color: #565656;
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ============================================================
+    // WORD BANKS
+    // ============================================================
+
+    // ~200 curated answer words (common, no obscure words)
+    const ANSWERS = [
+      "about","abuse","actor","acute","admit","adopt","adult","after","again","agent",
+      "agree","ahead","alarm","album","alert","alike","alive","alley","allow","alone",
+      "along","alter","angel","anger","angle","angry","anime","ankle","annex","apple",
+      "apply","arena","argue","arise","armor","array","apart","asset","atlas","attic",
+      "audio","audit","avoid","award","aware","awful","basic","basis","batch","beach",
+      "beard","beast","begin","being","below","bench","birth","black","blade","blame",
+      "bland","blank","blast","blaze","bleed","blend","bless","blind","block","blood",
+      "bloom","blown","board","bonus","boost","booth","bound","boxer","brain","brand",
+      "brave","bread","break","breed","bride","brief","bring","broad","broke","brook",
+      "brush","buddy","build","built","bunch","burnt","burst","buyer","cabin","candy",
+      "carry","catch","cause","chain","chair","chaos","charm","chart","chase","cheap",
+      "check","cheek","chess","chest","chief","child","choir","civil","claim","class",
+      "clean","clear","clerk","click","cliff","cling","clock","clone","close","cloth",
+      "cloud","coast","color","combo","comic","comes","coral","count","court","cover",
+      "crack","craft","crash","crazy","cream","creek","crime","crimp","crisp","cross",
+      "crowd","crown","cruel","crush","curve","cycle","daily","dance","death","decay",
+      "delay","delta","depot","depth","derby","devil","diary","digit","dirty","disco",
+      "doing","doubt","dough","draft","drain","drama","drank","drawn","dream","dress",
+      "drift","drill","drink","drive","drove","dying","eagle","early","earth","eight",
+      "elite","empty","enjoy","enter","equal","error","essay","event","every","exact",
+      "extra","faint","faith","false","fancy","fatal","fault","feast","fence","feral",
+      "fetch","fever","field","fiery","fifty","fight","final","first","fixed","flame",
+      "flash","fleet","flesh","float","floor","floss","flour","fluid","focal","focus",
+      "force","forge","forth","forum","found","frame","frank","fraud","fresh","front",
+      "frost","froze","fruit","fully","funny","ghost","giant","given","glass","gloom",
+      "glory","glove","going","grace","grade","grain","grand","grant","grape","grass",
+      "grate","grave","great","green","grief","grind","groan","gross","group","grove",
+      "grown","guard","guess","guest","guide","guild","guile","guise","gusto","habit",
+      "happy","harsh","heart","heavy","hedge","hello","hence","herbs","highs","hinge",
+      "honor","horse","hotel","house","human","humor","hurry","hyper","ideal","image",
+      "imply","inbox","index","indie","inner","input","inter","intro","jewel","joint",
+      "joker","judge","juice","juicy","jumpy","karma","kneel","knife","knock","known",
+      "label","large","laser","later","laugh","layer","learn","lease","least","leave",
+      "legal","level","light","limit","local","logic","loose","lover","lucky","lunar",
+      "lunch","lying","magic","major","maker","manor","maple","march","match","mayor",
+      "media","mercy","merit","metal","might","minor","minus","model","money","month",
+      "moral","motor","mount","mouse","mouth","movie","music","naive","nerve","never",
+      "night","ninja","noise","north","noted","novel","nurse","oasis","occur","ocean",
+      "offer","often","order","other","outer","owned","owner","oxide","ozone","paint",
+      "panel","panic","paper","party","pasta","patch","pause","peace","peach","pearl",
+      "penny","perky","phase","phone","photo","piano","piece","pilot","pitch","pixel",
+      "place","plain","plane","plant","plate","plaza","point","polar","poppy","power",
+      "press","price","pride","prime","print","prior","prize","probe","prone","proof",
+      "proud","prove","proxy","pulse","punch","puppy","quest","queue","quick","quiet",
+      "quota","quote","radar","radio","raise","rally","range","rapid","ratio","reach",
+      "realm","rebel","reign","relax","reply","rider","ridge","right","rigid","risky",
+      "rival","river","robot","rocky","rouge","rough","round","route","royal","ruler",
+      "rural","saint","sandy","sauce","scale","scene","scent","score","scout","seize",
+      "sense","serve","setup","seven","shade","shake","shall","shame","shape","share",
+      "shark","sharp","shift","shine","shirt","shock","shore","short","shout","sight",
+      "silly","since","sixth","sixty","skill","skull","slate","slave","slice","slide",
+      "slope","smile","smoke","snake","solar","solid","solve","sorry","sound","south",
+      "space","speak","speed","spend","spice","spill","spine","spite","split","spoke",
+      "spoon","sport","spray","stack","staff","stage","stain","stake","stale","stand",
+      "stare","stark","start","state","stays","steam","steel","steep","steer","stern",
+      "stick","stiff","still","stock","stood","store","storm","story","stove","stuck",
+      "study","stuff","style","sugar","suite","sunny","super","surge","swamp","swear",
+      "sweep","sweet","swept","swift","swing","sword","swore","sworn","table","taste",
+      "teach","tears","teeth","tempo","tense","tenth","terms","their","theme","there",
+      "these","thick","thing","think","third","those","three","threw","throw","thumb",
+      "tiger","tight","timer","tired","title","today","token","total","touch","tough",
+      "trace","track","trade","trail","train","trait","trash","treat","trend","trial",
+      "tribe","trick","tried","troop","truck","truly","trump","trunk","trust","truth",
+      "tumor","tuned","twist","typed","ulcer","ultra","uncle","under","unify","union",
+      "unity","until","upper","urban","usage","usher","usual","utter","vague","valid",
+      "value","valve","verse","video","vigor","viral","virus","visit","visor","vista",
+      "vital","vivid","vocal","voice","voter","wagon","waste","watch","water","weary",
+      "weave","wedge","weigh","weird","whale","wheat","wheel","where","which","while",
+      "white","whole","wider","witch","woman","women","world","worry","worse","worst",
+      "worth","would","wound","wrath","write","wrong","yacht","yield","young","yours",
+      "youth","zebra","zesty","zippy","zonal"
+    ];
+
+    // ~2000 valid 5-letter words for guess validation
+    // Includes the answer list plus additional valid words
+    const VALID_WORDS = new Set([
+      ...ANSWERS,
+      "aahed","aalii","abaci","aback","abaft","abase","abash","abate","abbey","abbot",
+      "abhor","abide","abler","abode","aboon","abore","aborn","abray","abrim","abrin",
+      "abris","absey","abuna","abune","abury","abyes","abyss","acerb","ached","aches",
+      "acids","acing","acned","acnes","acock","acold","acorn","acred","acres","acted",
+      "actin","acton","acyls","adage","added","adder","added","adeem","adhere","adjoin",
+      "adman","admen","adobe","aeons","afoot","agate","agave","agaze","agene","aggie",
+      "agios","agism","agist","agita","aglow","agma","agone","agons","agood","agora",
+      "agued","agues","ahead","ahull","aided","aider","aides","aioli","aired","airn",
+      "airts","aitch","aivers","ajiva","akela","akene","alamo","aland","alane","alans",
+      "alary","alate","alays","albas","algae","algas","algin","alifs","aline","aloft",
+      "aloos","aloud","alpha","altar","amass","amaze","ambit","ambos","amice","amide",
+      "amine","amino","amiss","amped","ample","amply","amuse","anear","anele","anent",
+      "anew","anigh","anile","anils","anima","anion","anise","antsy","anvil","aorta",
+      "apian","aping","apish","arced","ardor","argue","ariel","armet","arpen","arras",
+      "arris","atoll","atoms","atone","atopy","atrip","awake","awash","awned","awning",
+      "awoke","azure","baaed","babel","badge","badly","bails","bairn","baize","baked",
+      "baker","bales","balms","bandy","banes","bangs","banjo","banks","bards","barge",
+      "baron","based","basil","basin","baste","batik","baton","baulk","bayou","beady",
+      "beams","beaus","beaut","bedim","beige","belle","belly","below","berry","berth",
+      "beryl","betel","bevel","bidet","bigot","biker","biome","bison","bitty","blunt",
+      "blurb","blurt","blush","boggy","bogus","boils","bolts","bongo","bonds","bones",
+      "bonny","booby","booze","boozy","bossy","botch","bowed","bowel","brawl","brawn",
+      "brays","braze","bribe","brink","briny","broil","brood","broom","brown","browse",
+      "brunt","brute","buggy","bugle","bulge","bumpy","bunny","burly","bylaw","bytes",
+      "cache","caddy","cadet","camel","cameo","camps","campy","canal","caper","capri",
+      "carob","carol","caste","cater","cattie","catty","caulk","caves","cedar","cells",
+      "chafe","chaff","chaps","chard","chasm","cheep","chide","chive","chock","chord",
+      "chore","chump","chunk","churn","chute","cigar","cinch","civic","clack","clamp",
+      "clang","clank","claps","clown","clump","clunk","coils","colic","colon","cramp",
+      "crank","craze","creak","creep","crest","creep","crick","crisp","crook","croon",
+      "croup","crust","cubic","cuddle","cuffs","curly","daddy","daffy","daisy","dandy",
+      "darts","datum","daunt","dazed","debut","decal","dodge","dogma","dolly","dolma",
+      "dowry","drabs","drape","drawl","drool","droop","drops","drone","dunce","dusky",
+      "dusty","dweeb","dwelt","elbow","emote","enact","endow","epoch","evict","exert",
+      "exude","exult","eyrie","fable","facet","faker","farce","farther","fatty","fauna",
+      "fawns","fizzy","fjord","flack","flair","flaky","flare","flask","flick","flint",
+      "flinch","flute","foamy","fodder","foggy","folly","foray","forge","forte","forum",
+      "foyer","frail","frill","frisk","fritz","frogs","froze","fudge","fugue","furry",
+      "fuzzy","gaudy","gauze","gavel","gawky","gears","gecko","geeky","geese","giddy",
+      "girth","gizmo","gnash","gnome","godly","going","golly","gouge","gourd","grasp",
+      "graze","greed","greet","grimm","grimy","gripe","grips","grist","groom","grope",
+      "grout","growl","gruel","gruff","guava","gulch","gummy","gusts","gusty","gypsy",
+      "hairy","haste","haven","havoc","haydn","hence","heron","hippo","hoist","holly",
+      "homer","honey","horde","hotly","hound","hover","humid","hunky","haste","hyena",
+      "icier","icing","idiom","igloo","iliac","ionic","irked","itchy","ivory","jaunt",
+      "jazzy","jerky","jocund","joust","knave","kneel","knelt","knick","knobs","knoll",
+      "knots","kudos","lance","lanky","lapel","latch","lapse","lately","lemon","lemur",
+      "lingo","liner","links","liven","liver","llama","loamy","loath","lobby","lofty",
+      "lousy","lowly","lumpy","lusty","lustre","mafia","manly","manor","manta","manor",
+      "marsh","mason","masse","matte","maxim","mealy","meander","melee","melon","mercy",
+      "messy","melee","milky","mirth","miser","misty","miter","mitre","mocha","moldy",
+      "molten","moody","mossy","motif","motto","mousy","muddy","muggy","mulch","murky",
+      "musty","nappy","natal","navel","needy","nerdy","nettle","noble","noisy","norms",
+      "notch","nutty","nymph","obese","oxide","pansy","parka","patio","patsy","petty",
+      "piece","piggy","pile","pinch","piney","pixie","pizza","plaid","plank","plaque",
+      "plumb","plume","plump","plunk","plush","poach","podgy","polka","poplar","posse",
+      "pouch","prude","pudgy","puffy","quaff","qualm","quell","rabid","rainy","ramen",
+      "raspy","ratty","raven","rawly","recap","reek","reeve","regal","relay","relic",
+      "rummy","runny","rusty","sagas","sandy","sassy","sauna","scalp","scamp","scone",
+      "scorn","siren","skimp","skim","skit","slant","slap","slash","sleet","slew",
+      "slink","slosh","sloth","smack","smear","smelt","smirk","snack","snaky","snare",
+      "sneer","snide","snore","snort","snowy","soapy","sodden","soggy","spade","spank",
+      "spark","spawn","speck","spook","spore","spout","spree","squad","squat","squid",
+      "squint","squirt","staid","stamp","stern","stoic","stomp","stump","stung","stunk",
+      "stunt","spunk","suave","sulky","sully","sunlit","svelte","swipe","swoop","tabby",
+      "taffy","tangy","taunt","tawny","tepid","terra","terse","techy","thane","thatch",
+      "theft","them","thong","thrum","thud","thugs","tiara","tidal","tinge","tipsy",
+      "titty","toast","toadstool","topsy","torso","toucan","toxic","traitor","trawl",
+      "trek","tremble","trench","trim","tromp","trowel","tulip","tummy","turbo","tunic",
+      "twerp","twice","twixt","umbra","unmet","unset","untie","untrue","venom","verge",
+      "vigil","villa","viper","vixen","vying","wacky","wafer","wager","waltz","warty",
+      "wavy","weedy","wench","whack","whiff","whiny","wimpy","wince","windy","wispy",
+      "witty","wizened","woeful","wonky","wormy","woozy","wrangle","wring","wrist","zingy",
+      "zonal","zombi","adore","aloha","amble","angst","ardent","cacao","charm","comma",
+      "cycle","delve","disco","disco","ditto","divvy","dizzy","dummy","dunno","edgy",
+      "elegy","ember","empty","ennui","envoy","feral","ferry","filmy","finny","fizz",
+      "foghorn","folly","fugal","gaily","gauzy","genial","gimpy","goblin","grail","grimy",
+      "hazel","hefty","hokum","horsy","hippy","homey","inept","inert","itinerant","jazzy",
+      "jiffy","jilted","kangaroo","kayak","knack","lackey","lofty","lowly","madly","mangy",
+      "minty","moody","mouthy","muddy","murky","mushy","nasty","needy","nervy","nippy",
+      "nutso","oafish","oddly","other","otter","outdo","outfox","ozark","paddy","papery",
+      "patchy","penal","peppy","perky","petty","piney","pithy","pizazz","placid","plaid",
+      "plunk","podgy","poise","polled","polyp","poncho","poodle","posture","potty","prism",
+      "prune","puffy","pudgy","pulpy","raspy","randy","ratty","reedy","reek","rowdy",
+      "ruddy","rustic","salty","seedy","shady","shimmy","shiny","siren","sixty","skunky",
+      "slick","slinky","smear","snappy","snoopy","soggy","spiffy","spiky","stalk","stark",
+      "stony","stormy","stuffy","swear","tacky","tangy","tardy","tawdry","teethy","tepid",
+      "testy","thirsty","thorny","timid","toasty","torrid","touchy","trashy","trendy",
+      "trippy","turvy","twisty","unruly","upbeat","vapid","veiny","venom","viral","wacky",
+      "wader","warty","weedy","weird","whirly","windy","witty","wobbly","wordy","wormy",
+      "zippy","jumbo","prank","cruse","berms","bivvy","boffo","burbs","dandy","dingo",
+      "dippy","ditsy","dodgy","dowdy","donut","elate","patio","oxter","quaff"
+    ]);
+
+    // ============================================================
+    // DAILY WORD SELECTION
+    // ============================================================
+
+    function getDayOfYear(date) {
+      const start = new Date(date.getFullYear(), 0, 0);
+      const diff = date - start;
+      const oneDay = 1000 * 60 * 60 * 24;
+      return Math.floor(diff / oneDay);
+    }
+
+    function getTodayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    }
+
+    function getDailyAnswer() {
+      const d = new Date();
+      const seed = d.getFullYear() * 1000 + getDayOfYear(d);
+      return ANSWERS[seed % ANSWERS.length].toUpperCase();
+    }
+
+    // ============================================================
+    // CONSTANTS
+    // ============================================================
+
+    const MAX_GUESSES = 6;
+    const WORD_LENGTH = 5;
+    const DAILY_ANSWER = getDailyAnswer();
+
+    // ============================================================
+    // EVALUATION LOGIC
+    // ============================================================
+
+    // Returns array of {letter, state} where state is 'correct'|'present'|'absent'
+    function evaluateGuess(guess, answer) {
+      const result = Array(WORD_LENGTH).fill(null).map((_, i) => ({
+        letter: guess[i],
+        state: 'absent',
+      }));
+
+      const answerLetters = answer.split('');
+      const guessLetters = guess.split('');
+      const matched = Array(WORD_LENGTH).fill(false); // answer positions consumed
+
+      // First pass: exact matches
+      for (let i = 0; i < WORD_LENGTH; i++) {
+        if (guessLetters[i] === answerLetters[i]) {
+          result[i].state = 'correct';
+          matched[i] = true;
+        }
+      }
+
+      // Second pass: present (wrong position)
+      for (let i = 0; i < WORD_LENGTH; i++) {
+        if (result[i].state === 'correct') continue;
+        for (let j = 0; j < WORD_LENGTH; j++) {
+          if (!matched[j] && guessLetters[i] === answerLetters[j]) {
+            result[i].state = 'present';
+            matched[j] = true;
+            break;
+          }
+        }
+      }
+
+      return result;
+    }
+
+    // ============================================================
+    // LOCAL STORAGE
+    // ============================================================
+
+    const STATE_KEY = `wordle-state-${getTodayKey()}`;
+    const STATS_KEY = 'wordle-stats';
+
+    function loadGameState() {
+      try {
+        const raw = localStorage.getItem(STATE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    }
+
+    function saveGameState(state) {
+      try {
+        localStorage.setItem(STATE_KEY, JSON.stringify(state));
+      } catch {}
+    }
+
+    function loadStats() {
+      try {
+        const raw = localStorage.getItem(STATS_KEY);
+        return raw ? JSON.parse(raw) : {
+          played: 0, won: 0, currentStreak: 0, maxStreak: 0,
+          distribution: { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
+          lastWonDate: null,
+        };
+      } catch {
+        return {
+          played: 0, won: 0, currentStreak: 0, maxStreak: 0,
+          distribution: { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
+          lastWonDate: null,
+        };
+      }
+    }
+
+    function saveStats(stats) {
+      try {
+        localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+      } catch {}
+    }
+
+    // ============================================================
+    // COUNTDOWN TIMER
+    // ============================================================
+
+    function getTimeUntilMidnight() {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diff = midnight - now;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    // ============================================================
+    // MAIN APP COMPONENT
+    // ============================================================
+
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    function App() {
+      // Initialize state from localStorage or fresh
+      const initState = () => {
+        const saved = loadGameState();
+        if (saved) return saved;
+        return {
+          guesses: [],        // array of evaluated guess rows
+          currentGuess: '',   // letters typed so far in current row
+          gameStatus: 'playing', // 'playing' | 'won' | 'lost'
+        };
+      };
+
+      const [guesses, setGuesses] = useState(() => initState().guesses);
+      const [currentGuess, setCurrentGuess] = useState(() => initState().currentGuess);
+      const [gameStatus, setGameStatus] = useState(() => initState().gameStatus);
+
+      // Key letter states for on-screen keyboard coloring
+      const [keyStates, setKeyStates] = useState(() => {
+        const saved = loadGameState();
+        if (saved && saved.keyStates) return saved.keyStates;
+        return {};
+      });
+
+      // Animation triggers
+      const [shakingRow, setShakingRow] = useState(null);
+      const [flippingRow, setFlippingRow] = useState(null);
+      const [bounceRow, setBounceRow] = useState(null);
+      const [revealedRows, setRevealedRows] = useState(() => {
+        const saved = loadGameState();
+        return saved ? (saved.revealedRows || Array(saved.guesses.length).fill(true)) : [];
+      });
+
+      // Modals
+      const [showStats, setShowStats] = useState(false);
+      const [showHelp, setShowHelp] = useState(false);
+
+      // Toasts
+      const [toasts, setToasts] = useState([]);
+
+      // Stats
+      const [stats, setStats] = useState(() => loadStats());
+
+      // Countdown
+      const [countdown, setCountdown] = useState(getTimeUntilMidnight());
+
+      // -------- Persistence --------
+      useEffect(() => {
+        const state = { guesses, currentGuess, gameStatus, keyStates, revealedRows };
+        saveGameState(state);
+      }, [guesses, currentGuess, gameStatus, keyStates, revealedRows]);
+
+      // Countdown ticker
+      useEffect(() => {
+        const interval = setInterval(() => setCountdown(getTimeUntilMidnight()), 1000);
+        return () => clearInterval(interval);
+      }, []);
+
+      // Show stats modal automatically when game ends (brief delay)
+      useEffect(() => {
+        if (gameStatus !== 'playing') {
+          const t = setTimeout(() => setShowStats(true), 2500);
+          return () => clearTimeout(t);
+        }
+      }, [gameStatus]);
+
+      // -------- Toast helpers --------
+      const showToast = useCallback((msg, persist = false) => {
+        const id = Date.now() + Math.random();
+        setToasts(prev => [...prev, { id, msg, persist }]);
+        if (!persist) {
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+          }, 2000);
+        }
+      }, []);
+
+      // -------- Key states update --------
+      const updateKeyStates = useCallback((evaluated) => {
+        setKeyStates(prev => {
+          const next = { ...prev };
+          const priority = { correct: 3, present: 2, absent: 1 };
+          for (const { letter, state } of evaluated) {
+            const cur = next[letter];
+            if (!cur || priority[state] > priority[cur]) {
+              next[letter] = state;
+            }
+          }
+          return next;
+        });
+      }, []);
+
+      // -------- Submit guess --------
+      const submitGuess = useCallback(() => {
+        if (gameStatus !== 'playing') return;
+        const word = currentGuess.toUpperCase();
+
+        if (word.length < WORD_LENGTH) return;
+
+        // Validate against word list
+        if (!VALID_WORDS.has(word.toLowerCase())) {
+          showToast('Not in word list');
+          setShakingRow(guesses.length);
+          setTimeout(() => setShakingRow(null), 700);
+          return;
+        }
+
+        const evaluated = evaluateGuess(word, DAILY_ANSWER);
+        const rowIndex = guesses.length;
+
+        // Start flip animation
+        setFlippingRow(rowIndex);
+
+        // Add the guess immediately (for tile display), mark as not yet revealed
+        setGuesses(prev => [...prev, evaluated]);
+        setCurrentGuess('');
+        setRevealedRows(prev => [...prev, false]);
+
+        // After flip completes, reveal colors and update keyboard
+        setTimeout(() => {
+          setRevealedRows(prev => {
+            const next = [...prev];
+            next[rowIndex] = true;
+            return next;
+          });
+          setFlippingRow(null);
+          updateKeyStates(evaluated);
+
+          const isWin = evaluated.every(e => e.state === 'correct');
+          const isLoss = !isWin && rowIndex + 1 >= MAX_GUESSES;
+
+          if (isWin) {
+            const messages = ['Genius!','Magnificent!','Impressive!','Splendid!','Great!','Phew!'];
+            showToast(messages[rowIndex] || 'Nice!');
+            setBounceRow(rowIndex);
+            setTimeout(() => setBounceRow(null), 1000);
+            setGameStatus('won');
+            // Update stats
+            const newStats = { ...stats };
+            newStats.played++;
+            newStats.won++;
+            const guessCount = rowIndex + 1;
+            newStats.distribution[guessCount] = (newStats.distribution[guessCount] || 0) + 1;
+            const today = getTodayKey();
+            // Check streak continuity
+            const yesterday = (() => {
+              const d = new Date();
+              d.setDate(d.getDate() - 1);
+              return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            })();
+            if (newStats.lastWonDate === yesterday) {
+              newStats.currentStreak++;
+            } else {
+              newStats.currentStreak = 1;
+            }
+            newStats.maxStreak = Math.max(newStats.maxStreak, newStats.currentStreak);
+            newStats.lastWonDate = today;
+            setStats(newStats);
+            saveStats(newStats);
+          } else if (isLoss) {
+            showToast(DAILY_ANSWER, true);
+            setGameStatus('lost');
+            // Update stats (played but not won)
+            const newStats = { ...stats };
+            newStats.played++;
+            newStats.currentStreak = 0;
+            setStats(newStats);
+            saveStats(newStats);
+          }
+        }, WORD_LENGTH * 300 + 200);
+      }, [currentGuess, guesses, gameStatus, showToast, updateKeyStates, stats]);
+
+      // -------- Handle key input --------
+      const handleKey = useCallback((key) => {
+        if (gameStatus !== 'playing') return;
+        if (key === 'ENTER') {
+          submitGuess();
+        } else if (key === 'BACKSPACE') {
+          setCurrentGuess(prev => prev.slice(0, -1));
+        } else if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) {
+          setCurrentGuess(prev => prev + key);
+        }
+      }, [gameStatus, currentGuess, submitGuess]);
+
+      // Physical keyboard listener
+      useEffect(() => {
+        const handler = (e) => {
+          if (e.ctrlKey || e.altKey || e.metaKey) return;
+          if (e.key === 'Enter') handleKey('ENTER');
+          else if (e.key === 'Backspace') handleKey('BACKSPACE');
+          else if (/^[a-zA-Z]$/.test(e.key)) handleKey(e.key.toUpperCase());
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+      }, [handleKey]);
+
+      // -------- Share --------
+      const handleShare = useCallback(() => {
+        const dayNum = getDayOfYear(new Date());
+        const header = `Wordle Clone ${dayNum} ${gameStatus === 'won' ? guesses.length : 'X'}/6`;
+        const emojiMap = { correct: String.fromCodePoint(0x1F7E9), present: String.fromCodePoint(0x1F7E8), absent: String.fromCodePoint(0x2B1B) };
+        const rows = guesses.map(row => row.map(e => emojiMap[e.state]).join('')).join('\n');
+        const text = `${header}\n\n${rows}`;
+        navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+      }, [guesses, gameStatus, showToast]);
+
+      // -------- Render board --------
+      const renderBoard = () => {
+        const rows = [];
+        for (let r = 0; r < MAX_GUESSES; r++) {
+          const isCurrentRow = r === guesses.length;
+          const isShaking = shakingRow === r;
+
+          const tiles = [];
+          for (let c = 0; c < WORD_LENGTH; c++) {
+            let letter = '';
+            let tileClass = 'tile';
+            let style = {};
+
+            if (r < guesses.length) {
+              // Submitted guess
+              const evalEntry = guesses[r];
+              letter = evalEntry[c].letter;
+              const revealed = revealedRows[r];
+              if (revealed) {
+                tileClass += ` ${evalEntry[c].state}`;
+              } else {
+                // During flip: apply color at midpoint via delay
+                const delay = c * 300;
+                style = { animationDelay: `${delay}ms` };
+                tileClass += ' flip';
+              }
+              if (bounceRow === r) {
+                tileClass += ' bounce';
+                style = { ...style, animationDelay: `${c * 80}ms` };
+              }
+            } else if (isCurrentRow) {
+              letter = currentGuess[c] || '';
+              if (letter) tileClass += ' filled';
+            }
+
+            tiles.push(
+              <div key={c} className={tileClass} style={style}>
+                {letter}
+              </div>
+            );
+          }
+
+          rows.push(
+            <React.Fragment key={r}>
+              <div
+                className={`row-wrapper${isShaking ? ' row-shake' : ''}`}
+                style={{ display: 'contents' }}
+              >
+                {tiles}
+              </div>
+            </React.Fragment>
+          );
+        }
+        return rows;
+      };
+
+      // -------- Render keyboard --------
+      const keyRows = [
+        ['Q','W','E','R','T','Y','U','I','O','P'],
+        ['A','S','D','F','G','H','J','K','L'],
+        ['ENTER','Z','X','C','V','B','N','M','BACKSPACE'],
+      ];
+
+      const renderKeyboard = () => keyRows.map((row, ri) => (
+        <div key={ri} className="keyboard-row">
+          {row.map(key => {
+            const state = keyStates[key] || '';
+            const isWide = key === 'ENTER' || key === 'BACKSPACE';
+            return (
+              <button
+                key={key}
+                className={`key${isWide ? ' wide' : ''}${state ? ` ${state}` : ''}`}
+                onClick={() => handleKey(key)}
+              >
+                {key === 'BACKSPACE' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/>
+                  </svg>
+                ) : key}
+              </button>
+            );
+          })}
+        </div>
+      ));
+
+      // -------- Stats Modal --------
+      const renderStats = () => {
+        const maxVal = Math.max(1, ...Object.values(stats.distribution));
+        const winPct = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
+        const currentGuessCount = gameStatus === 'won' ? guesses.length : null;
+
+        return (
+          <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowStats(false); }}>
+            <div className="modal">
+              <button className="modal-close" onClick={() => setShowStats(false)}>x</button>
+              <h2>STATISTICS</h2>
+              <div className="stats-grid">
+                {[
+                  [stats.played, 'Played'],
+                  [winPct, 'Win %'],
+                  [stats.currentStreak, 'Current Streak'],
+                  [stats.maxStreak, 'Max Streak'],
+                ].map(([val, label]) => (
+                  <div key={label} className="stat-box">
+                    <div className="stat-number">{val}</div>
+                    <div className="stat-label">{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="distribution-title">GUESS DISTRIBUTION</div>
+              <div className="distribution">
+                {[1,2,3,4,5,6].map(n => {
+                  const count = stats.distribution[n] || 0;
+                  const width = Math.max(28, Math.round((count / maxVal) * 100));
+                  const highlight = currentGuessCount === n;
+                  return (
+                    <div key={n} className="dist-row">
+                      <div className="dist-label">{n}</div>
+                      <div className="dist-bar-wrap">
+                        <div
+                          className={`dist-bar${highlight ? ' highlight' : ''}`}
+                          style={{ width: `${width}%` }}
+                        >
+                          {count}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="stats-footer">
+                <div className="countdown-section">
+                  <div className="countdown-label">NEXT WORDLE</div>
+                  <div className="countdown-time">{countdown}</div>
+                </div>
+                {gameStatus !== 'playing' && (
+                  <button className="share-btn" onClick={handleShare}>
+                    SHARE
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // -------- Help Modal --------
+      const renderHelp = () => (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowHelp(false); }}>
+          <div className="modal">
+            <button className="modal-close" onClick={() => setShowHelp(false)}>x</button>
+            <h2>HOW TO PLAY</h2>
+            <div className="help-section">
+              Guess the <strong>WORDLE</strong> in 6 tries.
+              <br /><br />
+              Each guess must be a valid 5-letter word. Hit the enter button to submit.
+              <br /><br />
+              After each guess, the color of the tiles will change to show how close your guess was to the word.
+            </div>
+            <div className="help-section">
+              <strong>Examples</strong>
+              <div className="help-example">
+                <div className="help-tile correct">W</div>
+                <div className="help-tile">E</div>
+                <div className="help-tile">A</div>
+                <div className="help-tile">R</div>
+                <div className="help-tile">Y</div>
+              </div>
+              <strong>W</strong> is in the word and in the correct spot.
+            </div>
+            <div className="help-section">
+              <div className="help-example">
+                <div className="help-tile">P</div>
+                <div className="help-tile present">I</div>
+                <div className="help-tile">L</div>
+                <div className="help-tile">L</div>
+                <div className="help-tile">S</div>
+              </div>
+              <strong>I</strong> is in the word but in the wrong spot.
+            </div>
+            <div className="help-section">
+              <div className="help-example">
+                <div className="help-tile">V</div>
+                <div className="help-tile">A</div>
+                <div className="help-tile">G</div>
+                <div className="help-tile absent">U</div>
+                <div className="help-tile">E</div>
+              </div>
+              <strong>U</strong> is not in the word in any spot.
+            </div>
+          </div>
+        </div>
+      );
+
+      // -------- Render row with shake support --------
+      // Since CSS grid "display:contents" doesn't support animation on wrapper,
+      // we use a slightly different approach: wrap each row's 5 tiles in a sub-grid.
+      const renderBoardV2 = () => {
+        const rows = [];
+        for (let r = 0; r < MAX_GUESSES; r++) {
+          const isCurrentRow = r === guesses.length;
+          const isShaking = shakingRow === r;
+          const tiles = [];
+
+          for (let c = 0; c < WORD_LENGTH; c++) {
+            let letter = '';
+            let tileClass = 'tile';
+            let style = {};
+
+            if (r < guesses.length) {
+              const evalEntry = guesses[r];
+              letter = evalEntry[c].letter;
+              const revealed = revealedRows[r];
+              if (revealed) {
+                tileClass += ` ${evalEntry[c].state}`;
+                if (bounceRow === r) {
+                  tileClass += ' bounce';
+                  style = { animationDelay: `${c * 80}ms` };
+                }
+              } else {
+                const delay = c * 300;
+                style = { animationDelay: `${delay}ms` };
+                tileClass += ' flip';
+              }
+            } else if (isCurrentRow) {
+              letter = currentGuess[c] || '';
+              if (letter) tileClass += ' filled';
+            }
+
+            tiles.push(
+              <div key={c} className={tileClass} style={style}>
+                {letter}
+              </div>
+            );
+          }
+
+          rows.push(
+            <div
+              key={r}
+              className={`board-row${isShaking ? ' row-shake' : ''}`}
+            >
+              {tiles}
+            </div>
+          );
+        }
+        return rows;
+      };
+
+      return (
+        <>
+          {/* Header */}
+          <div className="header">
+            <div className="header-title">Wordle</div>
+            <div className="header-icons">
+              <button className="icon-btn" onClick={() => setShowHelp(true)} title="How to Play">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </button>
+              <button className="icon-btn" onClick={() => setShowStats(true)} title="Statistics">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M5 3H3v18h18v-2H5V3zm16 14H7V7h2v8h2V9h2v6h2v-4h2v4h2V7h-4v10z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Toasts */}
+          <div className="toast-container">
+            {toasts.map(t => (
+              <div key={t.id} className="toast">{t.msg}</div>
+            ))}
+          </div>
+
+          {/* Game */}
+          <div className="game-container">
+            {/* Board */}
+            <div className="board-v2" style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '5px',
+              marginBottom: '24px',
+            }}>
+              {renderBoardV2()}
+            </div>
+
+            {/* Keyboard */}
+            <div className="keyboard">
+              {renderKeyboard()}
+            </div>
+          </div>
+
+          {/* Modals */}
+          {showStats && renderStats()}
+          {showHelp && renderHelp()}
+
+          {/* Signature */}
+          <div className="signature">Created by Stonedhawk (Rahul)</div>
+        </>
+      );
+    }
+
+    // Inject board-row style
+    const style = document.createElement('style');
+    style.textContent = `
+      .board-row {
+        display: flex;
+        gap: 5px;
+      }
+    `;
+    document.head.appendChild(style);
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
